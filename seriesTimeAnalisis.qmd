@@ -1,0 +1,114 @@
+---
+title: "Entrega 3"
+author: "Juan Pablo De La Peña González"
+format:
+   html:
+     toc: true
+     html-math-method: katex
+     embed-resources: true
+     self-contained-math: true
+     df-print: kable
+editor: source
+---
+
+# Análisis de tráfico con Python
+
+## Data extracted 
+
+```{python}
+import pandas as pd
+import matplotlib.pyplot as plt
+```
+
+```{python}
+data=pd.read_csv("dataCapture.csv")
+```
+
+```{python}
+data.head()
+```
+
+## Time Series Analisis
+
+### Time Series of All Type of Packets, Counted per Minute
+
+```{python}
+data["Time"].max()
+```
+
+```{python}
+count_packets=[]
+for lower_bound in range(0,3000,60):
+    count_packets.append(data['Time'].between(lower_bound, lower_bound+60).sum().item())
+```
+
+```{python}
+plt.plot(range(1,51), count_packets, label = "All packets")  
+plt.title("Line Chart: Time Series of Packets Counted per Minute")
+plt.xlabel("Minutes since start")
+plt.ylabel("Packets counted")
+plt.legend()
+plt.show() 
+```
+
+ICMP
+DHCP
+
+### Time Series of Packets, Divided by ICMP and DHCP, Counted per Minute
+
+Expected attacks: ICMP, DHCP
+
+```{python}
+dataICMP = data.loc[data['Protocol'] == "ICMP"]
+dataDHCP = data.loc[data['Protocol'] == "DHCP"]
+```
+
+```{python}
+count_ICMP=[]
+count_DHCP=[]
+for lower_bound in range(0,3000,60):
+    count_ICMP.append(dataICMP['Time'].between(lower_bound, lower_bound+60).sum().item())
+    count_DHCP.append(dataDHCP['Time'].between(lower_bound, lower_bound+60).sum().item())
+```
+
+```{python}
+plt.plot(range(1,51), count_ICMP, label = "ICMP")
+plt.plot(range(1,51), count_DHCP, label = "DHCP")
+plt.title("Line Chart: Time Series of Packets Counted per Minute")
+plt.xlabel("Minutes since start")
+plt.ylabel("Packets counted")
+plt.legend()
+plt.show()
+```
+
+## Histogram of Top 10 by Source, Destination and Protocol
+
+```{python}
+# Configuración general del estilo
+plt.style.use('seaborn-v0_8-darkgrid')
+
+# Iterar sobre las columnas solicitadas
+for col in ["Source", "Destination", "Protocol"]:
+    plt.figure(figsize=(8, 4))
+
+    if col in ['Length']:  
+        # Histograma numérico
+        plt.hist(data[col].dropna(), bins=30, edgecolor='black')
+        plt.title(f"Histograma de {col}")
+        plt.xlabel(col)
+        plt.ylabel("Frecuencia")
+    else:
+        # Top 10 categorías más comunes
+        top10 = data[col].value_counts().head(10)
+        top10.plot(kind='bar')
+        plt.title(f"Top 10 valores de {col}")
+        plt.xlabel(col)
+        plt.ylabel("Frecuencia")
+
+    plt.tight_layout()
+    plt.show()
+```
+
+```{python}
+
+```
