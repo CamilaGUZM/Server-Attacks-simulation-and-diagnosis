@@ -38,7 +38,7 @@ Hay dos tipos principales:
 2. ARP Reply.
 
 
-### Ataques:
+### Ataques
 **ICMP Flood:** También conocido com inundación de ping, es un ataque de Denegación de Servicio (DoS) o Denegación de Servicio Distribuida (DDoS) que aprovecha el ICMP, normalmente mediante paquetes de tipo “echo request” (los usados en ping).
 Su funcionamiento puede resumirse en 4 pasos:
 1. El atacante envía una gran cantidad de solicitudes ICMP (ping) a la víctima.
@@ -65,7 +65,7 @@ Como  resultado si un cliente real quiere acceder a la red, se le niega porque y
 
 Se realizó en un Laboratorio la topología mostrada donde se siguieron las siguientes líneas de código en la terminal de la consola ligada al router:
 
-```{text}
+```bash
 enable
 configure terminal
 interface GigabitEthernet 0/0
@@ -82,9 +82,9 @@ Después de que se asignaron las IPs a las computadoras, se realizaron pings inf
 
 **(Ejemplo Adjunto)**
 
-```{text}
+```bash
 ping 10.0.0.4 -t
-
+```
 
 Lo que se observó en la plataforma al realizar los pings es que un ordenador no puede abrir paquetes con destinatarios ajenos. Se sospechó que esto podría deberse a los permisos configurados en el Switch del Laboratorio.
 
