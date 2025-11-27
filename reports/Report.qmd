@@ -1,0 +1,24 @@
+---
+title: "Simulación, Diagnóstico y Prevención de Ataques"
+author: "..."
+format:
+   html:
+     toc: true
+     html-math-method: katex
+     embed-resources: true
+     self-contained-math: true
+     df-print: kable
+editor: visual
+---
+
+# Fase 1: Diseño del escenario y explicación del ataque
+
+## Simulación Topológica
+
+**[Isertar imágenes]**
+
+En un caso real se espera que el analista no use la computadora de la víctima para realizar el análisis en la red. Lo ideal es emplear un dispositivo externo conectado a un puerto configurado en modo port mirroring o a través de un equipo de monitoreo dedicado. Sin embargo, por la configuración del switch en el laboratorio de pruebas, el análisis se realizará desde la computadora de la víctima, lo que implica que únicamente se podrá observar el tráfico que entra o sale de dicha máquina, y no el de los demás equipos de la red.
+
+
+## Conceptos y ataques a implementar
+
