@@ -65,7 +65,7 @@ Como  resultado si un cliente real quiere acceder a la red, se le niega porque y
 
 Se realizó en un Laboratorio la topología mostrada donde se siguieron las siguientes líneas de código en la terminal de la consola ligada al router:
 
-```{sh}
+```{text}
 enable
 configure terminal
 interface GigabitEthernet 0/0
@@ -80,28 +80,29 @@ ip dhcp pool JUAN
 
 Después de que se asignaron las IPs a las computadoras, se realizaron pings infinitos para documentarlos en WireShark.
 
-(Ejemplo Adjunto)
+**(Ejemplo Adjunto)**
 
-```{sh}
+```{text}
 ping 10.0.0.4 -t
-```
+
 
 Lo que se observó en la plataforma al realizar los pings es que un ordenador no puede abrir paquetes con destinatarios ajenos. Se sospechó que esto podría deberse a los permisos configurados en el Switch del Laboratorio.
 
-Sistema Operativo
-Windows.
+**Sistema Operativo** Windows.
 
-Herramientas necesarias
-Wireshark
-hping3 o nping (Nmap) para ICMP Flood.
-Ettercap, arpspoof (dsniff) o Bettercap  para ARP Spoofing.
-Yersinia o dhcpstarv para DHCP Starvation.
+**Herramientas necesarias**
 
-Permisos requeridos
-Acceso de administrador de sistema.
-Permisos para habilitar el modo promiscuo.
-Permisos para ejecución de herramientas de red.
-Acceso a la red de prueba sin firewall activado.
+- Wireshark
+- hping3 o nping (Nmap) para ICMP Flood.
+- Ettercap, arpspoof (dsniff) o Bettercap  para ARP Spoofing.
+- Yersinia o dhcpstarv para DHCP Starvation.
+
+**Permisos requeridos**
+
+- Acceso de administrador de sistema.
+- Permisos para habilitar el modo promiscuo.
+- Permisos para ejecución de herramientas de red.
+- Acceso a la red de prueba sin firewall activado.
 
 ---
 
@@ -115,8 +116,20 @@ Primeramente, se creó la topología del trabajo, donde se incluyó la consola a
 ## PING FLOOD
 Para poder llevar a cabo este ataque, se creó un archivo python. Se hizo uso de la librería scapy, la cual simplificó el flujo del código. En la función especificada para construir el ataque, se incluye la ip víctima, el número de paquetes a enviar y el tamaño de cada paquete. Para implementar este código, se direccionó hacia la ip 192.168.10.21 (el router) un total de 1,000 paquetes con un peso de 65,000 bytes (el máximo dentro de paquetes ICMP). El python fue ejecutado desde la terminal del atacante. Luego, para comprobar, se intentó hacer ping desde la computadora del cliente al router, donde en ocasiones, el tiempo de respuesta disminuye. En el Wireshark esto se contempla como un conjunto masivo de observaciones donde se reporta el protocolo ICMP hacia 192.168.10.21 y sus Echos.
 
+![Evidence of Attack 1](../figures/ping_flood0.png)
+
+
+![Evidence of Attack 2](../figures/ping_flood1.png)
+
 ## DHCP Starvation
 En la segunda situación, se utilizó igualmente scapy. En el código, se definieron funciones para crear las direcciones MAC falsas, para buscar una interfaz cuya IP empiece con prefix y entregar el nombre de la interfaz y buscar dicha interfaz. Finalmente, en la implementación hace uso de esta información para hacer una solicitud de asignación de una IP junto con la cantidad de IPs a solicitar especificada por el usuario. Esta se ejecutó desde la terminal del atacante junto con “Ethernet” como la interfaz identificada. En WireShark, esto se ve representado como múltiples solicitudes DHCP. Para verificar que fue exitoso el ataque, en la consola se buscaron los estadísticos del servidor DHCP, donde se verificó que 245 fueron asignados (recordemos que las primeras 10 direcciones fueron omitidas).
+
+
+![Evidence of Attack 1](../figures/dhcp_starv0.png)
+
+
+![Evidence of Attack 2](../figures/dhcp_starv1.png)
+
 
 ## Conclusiones
 La práctica confirmó que, en un entorno controlado, tanto el DHCP Starvation como el Ping Flood son capaces de degradar y/o interrumpir el servicio de red: el primero acaparó las direcciones disponibles del servidor DHCP (245 leases asignados en la prueba) y el segundo creó congestión perceptible en la conectividad ICMP hacia el router. Las evidencias captadas con Wireshark reafirman la efectividad de los ataques implementados en Python usando Scapy y la importancia de la monitorización para detectar este tipo de anomalías.
@@ -130,6 +143,9 @@ Como lecciones prácticas, estos ataques muestran la necesidad de controles de s
 
 ```
 
+
+
+---
 
 # Fase 4: Diagnóstico con ChatGPT y mitigación
 
@@ -331,7 +347,7 @@ Potencial escalación a explotación de vulnerabilidades
 
 
 ## Propuesta de mitigación
-### Nosotros:
+### Propuesta del equipo
 Después de analizar el tráfico capturado, notamos que la mayor parte del problema viene de una cantidad excesiva de paquetes ICMP, especialmente de pings (Echo Request). Esto puede saturar la red, causar lentitud y afectar a otros dispositivos.
 Por eso proponemos las siguientes acciones para mitigar este tipo de ataque:
 1. Limitar la cantidad de pings permitidos por segundo
