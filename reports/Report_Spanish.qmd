@@ -479,6 +479,7 @@ También, Chat-GPT hizo varios descubrimientos que nosotros no notamos (o no bus
 6.  **Canal UDP sospechoso (16990):** Evidencia: flujo intenso entre 192.168.10.12 y 192.168.10.13. Interpretación: posible túnel, canal C2, o aplicación no autorizada.
 
 **Síntomas observados:** 
+
 - Saturación de tráfico ICMP 
 - Pérdida de disponibilidad en DHCP 
 - Intentos de conexión TCP incompletos
