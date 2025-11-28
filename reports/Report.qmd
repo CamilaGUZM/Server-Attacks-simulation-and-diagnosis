@@ -1,6 +1,11 @@
 ---
 title: "Simulación, Diagnóstico y Prevención de Ataques"
-author: "..."
+author: 
+    - Camila Guzmán
+    - Damián Luna
+    - Juan Pablo de la Peña
+    - Gonzalo Higuera
+    - Alfredo Lopez
 format:
    html:
      toc: true
@@ -11,6 +16,9 @@ format:
 editor: visual
 ---
 
+# Abstract
+
+
 # Fase 1: Diseño del escenario y explicación del ataque
 
 ## Simulación Topológica
@@ -19,17 +27,19 @@ editor: visual
 
 ![Configuration code](../figures/config_code.png)
 
-En un caso real se espera que el analista no use la computadora de la víctima para realizar el análisis en la red. Lo ideal es emplear un dispositivo externo conectado a un puerto configurado en modo port mirroring o a través de un equipo de monitoreo dedicado. Sin embargo, por la configuración del switch en el laboratorio de pruebas, el análisis se realizará desde la computadora de la víctima, lo que implica que únicamente se podrá observar el tráfico que entra o sale de dicha máquina, y no el de los demás equipos de la red.
+En un caso real se espera que el analista no use la computadora de la víctima para realizar el análisis en la red. Lo ideal es emplear un dispositivo externo conectado a un puerto configurado en modo _port mirroring_ o a través de un equipo de monitoreo dedicado. Sin embargo, al terminar esta fase, se descubrió que, dada la configuración del switch en el laboratorio de pruebas, el análisis solamente podrá ser realizado desde el ordenador de la víctima -lo que implica que únicamente se podrá observar el tráfico que entra o sale de dicha máquina y no las interacciones entre los demás equipos de la red-.
 
 
-## Conceptos y ataques a implementar
+## Conceptos y Ataques a implementar
+
+Antes de realizar la simulación, es crucial la etapa de investigación junto con familiarización con los términos y metodologías utilizadas durante la práctica.
 
 ### Conceptos
 **ICMP:** Internet Control Message Protocol. Es un protocolo de la capa de red (dentro del conjunto de protocolos TCP/IP) que se utiliza principalmente para enviar mensajes de error y de diagnóstico en las comunicaciones de red. En el contexto de ataques, el ICMP es relevante porque existen ataques de denegación de servicio (DoS) que lo explotan, como el ICMP Flood.
 
-**DoS y DDoS:** Un DoS es un tipo de ataque en el que un “actor” malicioso intenta deshabilitar una computadora o red interrumpiendo el funcionamiento normal del dispositivo al sobrecargarlo de tráfico. Un DDoS es casi lo mismo, solo que éste opera mediante múltiples sistemas informáticos para generar su ataque.
+**DoS y DDoS:** Un DoS (Denial of Service) es un tipo de ataque en el que un “actor” malicioso intenta deshabilitar una computadora o red interrumpiendo el funcionamiento normal del dispositivo al sobrecargarlo de tráfico. Un DDoS (Distributed Denial of Service) es casi lo mismo, solo que éste opera mediante múltiples sistemas informáticos para generar su ataque.
 
-**ARP:** Address Resolution Protocol, es un  protocolo de red que se utiliza en redes IPv4 para enlazar una IP (lógica) con una MAC (física) dentro de una LAN.
+**ARP:** Address Resolution Protocol; es un  protocolo de red que se utiliza en redes IPv4 para enlazar una IP (lógica) con una MAC (física) dentro de una LAN.
 
 **ARP Messages:** Paquetes que envía el protocolo ARP dentro de la LAN para realizar la traducción IP ↔ MAC. 
 Hay dos tipos principales:
@@ -41,6 +51,7 @@ Hay dos tipos principales:
 ### Ataques
 **ICMP Flood:** También conocido com inundación de ping, es un ataque de Denegación de Servicio (DoS) o Denegación de Servicio Distribuida (DDoS) que aprovecha el ICMP, normalmente mediante paquetes de tipo “echo request” (los usados en ping).
 Su funcionamiento puede resumirse en 4 pasos:
+
 1. El atacante envía una gran cantidad de solicitudes ICMP (ping) a la víctima.
 2. Cada solicitud requiere ser procesada, ya que el paquete tiene que responder con un “echo reply”.
 3. Si el volumen de solicitudes es demasiado alto, los recursos de la víctima (GPU, memoria, etc) se saturan. 
@@ -48,22 +59,24 @@ Su funcionamiento puede resumirse en 4 pasos:
 
 **ARP Spoofing:** ARP Spoofing o ARP cache poisoning es un ataque de red en el cual un atacante envía mensajes ARP falsos en una red local con el objetivo de asociar su MAC address con la IP address de otro dispositivo, para así poder recolectar el tráfico destinado a esta IP. 
 Funciona de la siguiente manera:
+
 1. El atacante envía respuestas ARP no solicitadas imitando ser otro nodo.
 2. Los dispositivos en la red actualizan sus cachés ARP con esta información.
 3. El atacante puede acceder al tráfico de ésta IP que está “impersonando”.
 
 **DHCP Starvation:** Este ataque es del tipo de negación de servicio (DoS), su objetivo es dejar sin direcciones IP disponibles a un servidor DHCP. 
 Así funciona:
-El atacante envía un paquete DHCP Discover como si fuera un cliente normal, pero lo hace con direcciones MAC falsas en cada petición.
-El servidor responde ofreciendo una dirección IP libre de su pool.
-El atacante confirma y acepta de la IP ofrecida con un DHCP Request. Cómo usa una MAC diferente cada vez, el servidor piensa que es un dispositivo nuevo.
-El servidor registra esa IP como si fuera asignada a un cliente real.
+
+1. El atacante envía un paquete DHCP Discover como si fuera un cliente normal, pero lo hace con direcciones MAC falsas en cada petición.
+2. El servidor responde ofreciendo una dirección IP disponible en su _pool_.
+3. El atacante confirma y acepta de la IP ofrecida con un DHCP Request. Cómo usa una MAC diferente cada vez, el servidor piensa que es un dispositivo nuevo.
+4. El servidor registra esa IP como si fuera asignada a un cliente real.
 Se repiten los pasos anteriores cientos o miles de veces con MAC falsas cada vez.
-Como  resultado si un cliente real quiere acceder a la red, se le niega porque ya no quedan direcciones IP disponibles y así niega el servicio completamente.
+5. Como  resultado si un cliente real quiere acceder a la red, se le niega porque ya no quedan direcciones IP disponibles y así niega el servicio completamente.
 
-## Aplicación
+## Primer Acercamiento
 
-Se realizó en un Laboratorio la topología mostrada donde se siguieron las siguientes líneas de código en la terminal de la consola ligada al router:
+Se realizó en un laboratorio la topología mostrada. Se siguieron las siguientes líneas de código en la terminal de la consola ligada al router para la configuración:
 
 ```bash
 enable
@@ -78,15 +91,18 @@ ip dhcp pool JUAN
  default-router 10.0.0.1
 ```
 
-Después de que se asignaron las IPs a las computadoras, se realizaron pings infinitos para documentarlos en WireShark.
+Después de que se asignaron las IPs a las computadoras y se creó el grupo DHCP, se realizaron pings infinitos para documentarlos en la herramienta WireShark.
 
-**(Ejemplo Adjunto)**
+**(Ejemplo de comando en terminal Adjunto)**
 
 ```bash
 ping 10.0.0.4 -t
 ```
 
 Lo que se observó en la plataforma al realizar los pings es que un ordenador no puede abrir paquetes con destinatarios ajenos. Se sospechó que esto podría deberse a los permisos configurados en el Switch del Laboratorio.
+
+### Características del Ambiente Construido
+ Con fines de replicabilidad, se nombran a continuación las características de la práctica de laboratorio.
 
 **Sistema Operativo** Windows.
 
@@ -108,13 +124,19 @@ Lo que se observó en la plataforma al realizar los pings es que un ordenador no
 
 # Fase 2: Simulación del ataque y captura del tráfico
 ## Introducción
-El propósito de esta práctica es lograr una implementación de ataques virtuales mediante un entorno controlado -un laboratorio de redes-. Los dos causantes de DoS seleccionados a implementar fueron el DHCP Starvation, el cual envía numerosas solicitudes DHCP falsas con direcciones MAC distintas para agotar el rango de direcciones IP disponibles, impidiendo que dispositivos legítimos obtengan configuración de red; y Ping Flood, este envía un gran volumen de paquetes ICMP Echo Request para saturar el ancho de banda o recursos del sistema objetivo. Como se mencionó anteriormente, esto se realizó en un ambiente controlado y pudo ser evidenciado mediante WireShark manteniendo un registro del tráfico de paquetes.
+El propósito de esta segunda práctica es lograr una implementación de ataques virtuales mediante un entorno controlado: un laboratorio de redes. Los dos causantes de DoS seleccionados a implementar fueron el **DHCP Starvation**, el cual envía numerosas solicitudes DHCP falsas con direcciones MAC distintas para agotar el rango de direcciones IP disponibles - impidiendo que dispositivos legítimos obtengan configuración de red- y **Ping Flood** , este envía un gran volumen de paquetes ICMP Echo Request para saturar el ancho de banda o recursos del sistema objetivo. Como se mencionó anteriormente, esto se realizó en un ambiente controlado y fue evidenciado mediante la herramienta WireShark manteniendo un registro del tráfico de paquetes.
 
 ## Creación del Entorno de Trabajo
-Primeramente, se creó la topología del trabajo, donde se incluyó la consola al router, la cual funcionó como la víctima de la simulación, y una segunda computadora que funcionó como atacante y analista. Se configuró una pool dhcp con el rango de ips de 192.168.10.0 255.255.255.0 donde se excluyeron las primeras 10. Luego, desde la computadora del atacante se abrió el WireShark y se realizaron pruebas de pings infinitos para asegurar que las computadoras se pudieran comunicar. 
+Primeramente, se creó la topología de trabajo nuevamente, donde se incluyó la consola al router con función de la víctima, y una segunda computadora que funcionó como atacante y analista. Se configuró un grupo dhcp con el rango de IPs de 192.168.10.0 255.255.255.0 del cual se excluyeron las primeras 10. Luego, desde la computadora del atacante se abrió WireShark y se realizaron pruebas de pings infinitos para asegurar comunicación entre las computadoras. 
 
 ## PING FLOOD
-Para poder llevar a cabo este ataque, se creó un archivo python. Se hizo uso de la librería scapy, la cual simplificó el flujo del código. En la función especificada para construir el ataque, se incluye la ip víctima, el número de paquetes a enviar y el tamaño de cada paquete. Para implementar este código, se direccionó hacia la ip 192.168.10.21 (el router) un total de 1,000 paquetes con un peso de 65,000 bytes (el máximo dentro de paquetes ICMP). El python fue ejecutado desde la terminal del atacante. Luego, para comprobar, se intentó hacer ping desde la computadora del cliente al router, donde en ocasiones, el tiempo de respuesta disminuye. En el Wireshark esto se contempla como un conjunto masivo de observaciones donde se reporta el protocolo ICMP hacia 192.168.10.21 y sus Echos.
+Para poder llevar a cabo este ataque, se creó un archivo python. Se hizo uso de la librería _**Scapy**_, la cual simplificó el flujo del código. En la función especificada para construir el ataque, se incluye la dirección IP víctima, el número de paquetes a enviar y el tamaño de cada paquete. Para implementar el código, se direccionó hacia la ip 192.168.10.21 (el router) con un total de 1,000 paquetes y un peso de 65,000 bytes (el máximo dentro de paquetes ICMP). 
+
+
+
+
+
+El script fue ejecutado desde la terminal del atacante. Con fines de ratificación, se intentó hacer ping desde la computadora del cliente al router, donde en ocasiones, el tiempo de respuesta disminuía. En Wireshark esto se contempla como un conjunto masivo de observaciones donde se reporta el protocolo ICMP hacia 192.168.10.21 y sus Echos correspondientes.
 
 ![Evidence of Attack 1](../figures/ping_flood0.png)
 
