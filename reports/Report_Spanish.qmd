@@ -21,27 +21,32 @@ editor: visual
 ---
 
 # Abstract
+
 En el contexto de la ciberseguridad, los ataques de denegación de servicio y la manipulación de protocolos fundamentales han evolucionado desde simples experimentos académicos en la década de 1980[^1] hasta convertirse en amenazas críticas para infraestructuras modernas[^2]. Entre los ataques más representativos se encuentran el Ping Flood, descrito desde los primeros usos de ICMP para diagnóstico[^3], y el DHCP Starvation, identificado formalmente a inicios de los años 2000 como una vulnerabilidad inherente al diseño no autenticado del protocolo DHCP. Para comprender el funcionamiento y detección de estos ataques se recrearon en un ambiente controlado dentro de un Laboratorio.
 
-Esta investigación presenta el diseño, simulación, diagnóstico y mitigación de ataques de denegación de servicio en un entorno controlado de laboratorio. Se implementaron dos vectores principales: ICMP Flood y DHCP Starvation utilizando herramientas como _Scapy_, _Wireshark_ y equipos de red configurados manualmente. En la primera fase se construyó la topología de red y se analizaron sus limitaciones operativas; posteriormente, se ejecutaron los ataques y se capturó el tráfico generado para su estudio.
+[^1]: Denial-of-Service attack. (s. f.). En *Devopedia*. Recuperado de https://devopedia.org/denial-of-service-attack
 
-En la tercera fase, la premisa consiste en detectar estos ataques mediante la ciencia de datos -asumiendo que se desconoce su realización-. Para ello, los datos del archivo _.pcapng_ fueron transformados y analizados mediante Python, revelando picos anómalos de tráfico asociados a protocolos ICMP y DHCP[^4], y permitiendo identificar con precisión al origen y destino de los eventos [^5]. Finalmente, una inteligencia artificial (ChatGPT 5.1) fue utilizada para generar un diagnóstico independiente y recomendaciones de mitigación; con el propósito de evidenciar los horizontes que expanden y limitan estas herramientas. Los resultados resaltan la efectividad de ambos ataques para degradar la disponibilidad del servicio y subrayan la necesidad de controles como DHCP Snooping, port security, limitación de ICMP, IDS/IPS y monitoreo continuo para prevenir y contener incidentes similares en redes reales.
+[^2]: The Evolution of DDoS Attacks: From 1994 SYN Floods to Today’s Cyber Battleground. (s. f.). *Qrator Labs Blog*. Recuperado de https://blog.qrator.net/en/the-evolution-of-ddos-attacks-a-journey-from-1994_192/
 
-<p class="code-caption">
+[^3]: Ping of death. (s. f.). En *Wikipedia*. Recuperado de https://en.wikipedia.org/wiki/Ping_of_death
 
+Esta investigación presenta el diseño, simulación, diagnóstico y mitigación de ataques de denegación de servicio en un entorno controlado de laboratorio. Se implementaron dos vectores principales: ICMP Flood y DHCP Starvation utilizando herramientas como *Scapy*, *Wireshark* y equipos de red configurados manualmente. En la primera fase se construyó la topología de red y se analizaron sus limitaciones operativas; posteriormente, se ejecutaron los ataques y se capturó el tráfico generado para su estudio.
 
-[^1]: Denial-of-Service attack. (s. f.). En *Devopedia*. Recuperado de https://devopedia.org/denial-of-service-attack  
-[^2]: The Evolution of DDoS Attacks: From 1994 SYN Floods to Today’s Cyber Battleground. (s. f.). *Qrator Labs Blog*. Recuperado de https://blog.qrator.net/en/the-evolution-of-ddos-attacks-a-journey-from-1994_192/  
-[^3]: Ping of death. (s. f.). En *Wikipedia*. Recuperado de https://en.wikipedia.org/wiki/Ping_of_death  
-[^4]: Smurf attack. (s. f.). En *Wikipedia*. Recuperado de https://en.wikipedia.org/wiki/Smurf_attack  
+En la tercera fase, la premisa consiste en detectar estos ataques mediante la ciencia de datos -asumiendo que se desconoce su realización-. Para ello, los datos del archivo *.pcapng* fueron transformados y analizados mediante Python, revelando picos anómalos de tráfico asociados a protocolos ICMP y DHCP[^4], y permitiendo identificar con precisión al origen y destino de los eventos [^5]. Finalmente, una inteligencia artificial (ChatGPT 5.1) fue utilizada para generar un diagnóstico independiente y recomendaciones de mitigación; con el propósito de evidenciar los horizontes que expanden y limitan estas herramientas. Los resultados resaltan la efectividad de ambos ataques para degradar la disponibilidad del servicio y subrayan la necesidad de controles como DHCP Snooping, port security, limitación de ICMP, IDS/IPS y monitoreo continuo para prevenir y contener incidentes similares en redes reales.
+
+[^4]: Smurf attack. (s. f.). En *Wikipedia*. Recuperado de https://en.wikipedia.org/wiki/Smurf_attack
+
 [^5]: Argyraki, K., & Cheriton, D. R. (2003). *Active Internet Traffic Filtering: Real-time Response to Denial of Service Attacks*. arXiv.
 
+<p class="code-caption">
+
 </p>
 
 <p class="code-caption">
-Repositorio del proyecto disponible en GitHub: [Repository](https://github.com/CamilaGUZM/Server-Attacks-simulation-and-diagnosis.git)
-</p>
 
+Repositorio del proyecto disponible en GitHub: [Repository](https://github.com/CamilaGUZM/Server-Attacks-simulation-and-diagnosis.git)
+
+</p>
 
 # Fase 1: Diseño del escenario y explicación del ataque
 
@@ -354,12 +359,9 @@ Se descubre que hubo una proporción excesiva de paquetes ICMP y DHCP, la cual e
 
 ![Top IPs by Protocol](../figures/top_by_protocol.png)
 
-
 Al sobreponer este filtro de paquetes sobre la linea de tiempo anterior, se comprueba que esos protocolos son el origen de los picos de tráfico. Ahora la pregunta en cuestión es quiénes son los culpables.
 
-
 ![Time Series of ICMP and DHCP Package traffic](../figures/lineChart.png)
-
 
 En conjunto, analizamos las direcciones IP origen y destino ordenadas por frecuencia en la base de datos. El hallazgo es evidente: la dirección conflictiva corresponde a la 192.168.10.13 con dirección a la 192.168.10.1 (la cual corresponde al ruteador). Esto da indicadores de ataques con intención de deshabilitar al ruteador.
 
@@ -369,203 +371,172 @@ En conjunto, analizamos las direcciones IP origen y destino ordenadas por frecue
 
 Regresando a la serie de tiempo y teniendo en cuenta a los involucrados, se identifica una intención de ataque, por lo que se desgloza el comportamiento.
 
-La línea de tiempo muestra dos fases distintas de ataque: primero un ICMP
-Flood, con un alto volumen de paquetes en los primeros minutos, seguido por
-un DHCP Starvation, donde el tráfico DHCP aumenta significativamente hacia
-el final.
+La línea de tiempo muestra dos fases distintas de ataque: primero un ICMP Flood, con un alto volumen de paquetes en los primeros minutos, seguido por un DHCP Starvation, donde el tráfico DHCP aumenta significativamente hacia el final.
 
 ### **Explicación de Evidencia y Comportamiento de los Ataques**
 
-**ICMP Flood**
-El ataque ICMP Flood es más rápido y visible, ya que satura el ancho de banda
-o la capacidad de respuesta del servidor mediante miles de solicitudes ping.
-Es eficiente a corto plazo, pero fácil de detectar y mitigar (por firewalls o
-limitación de ICMP).
+**ICMP Flood** El ataque ICMP Flood es más rápido y visible, ya que satura el ancho de banda o la capacidad de respuesta del servidor mediante miles de solicitudes ping. Es eficiente a corto plazo, pero fácil de detectar y mitigar (por firewalls o limitación de ICMP).
 
-**DHCP Starvation**
-El DHCP Starvation, en cambio, no genera tanto tráfico, pero bloquea la
-asignación de IPs válidas a los clientes legítimos.
-Es más silencioso y persistente, por lo que puede ser más eficiente
-estratégicamente, especialmente en redes locales (LAN).
+**DHCP Starvation** El DHCP Starvation, en cambio, no genera tanto tráfico, pero bloquea la asignación de IPs válidas a los clientes legítimos. Es más silencioso y persistente, por lo que puede ser más eficiente estratégicamente, especialmente en redes locales (LAN).
 
 ![Time Series of ICMP and DHCP Package traffic](../figures/lineChart.png)
 
 ### Conclusión de Fase
-Aunque ambos ataques logran afectar la disponibilidad de la red, el
-DHCP Starvation es más eficiente a nivel estratégico, ya que usa menos
-recursos para saturar el serivcio del router. En cambio, el ICMP Flood
-provoca un impacto inmediato con un pico más alto, pero es más fácil de
-detectar y bloquear.
+
+Aunque ambos ataques logran afectar la disponibilidad de la red, el DHCP Starvation es más eficiente a nivel estratégico, ya que usa menos recursos para saturar el serivcio del router. En cambio, el ICMP Flood provoca un impacto inmediato con un pico más alto, pero es más fácil de detectar y bloquear.
 
 #### Diagnóstico
-Debido al análisis frecuentista podemos aseverar que los dos ataques
-identificados fueron de DHCP starvation y ping flood, dado que sus
-respectivos protocolos tuvieron las mayores interacciones. A su vez,
-podemos identificar puntualmente al atacante y a la víctima por la
-frecuencia de destinatario y origen.
 
+Debido al análisis frecuentista podemos aseverar que los dos ataques identificados fueron de DHCP starvation y ping flood, dado que sus respectivos protocolos tuvieron las mayores interacciones. A su vez, podemos identificar puntualmente al atacante y a la víctima por la frecuencia de destinatario y origen.
 
 ------------------------------------------------------------------------
 
 # Fase 4: Diagnóstico con Inteligencia Artificial y mitigación
 
-El objetivo de esta actividad es consultar a alguna inteligencia artificial, en este caso Chat-GPT Pro 5.1, con los datos recolectados de la simulación del ataque y captura de tráfico en un archivo _.pcapng_, elaborar un diagnóstico final y proponer soluciones o mitigaciones técnicas frente a las anomalías identificadas. Por cuestiones de limpieza, se incluirán sólo las partes cruciales de la conversación.
+El objetivo de esta actividad es consultar a alguna inteligencia artificial, en este caso Chat-GPT Pro 5.1, con los datos recolectados de la simulación del ataque y captura de tráfico en un archivo *.pcapng*, elaborar un diagnóstico final y proponer soluciones o mitigaciones técnicas frente a las anomalías identificadas. Por cuestiones de limpieza, se incluirán sólo las partes cruciales de la conversación.
 
 ## Transcripción de la conversación con Chat-GPT
 
-`Prompt:` _Hola, chat. Eres un analista de tráfico de datos (ciberseguridad) y te llegó este archivo .pcapng. Tu objetivo es analizar y mencionar las anomalías que puedas encontrar. Pesa más de 700 megas el archivo, así que estará en ZIP._
+`Prompt:` *Hola, chat. Eres un analista de tráfico de datos (ciberseguridad) y te llegó este archivo .pcapng. Tu objetivo es analizar y mencionar las anomalías que puedas encontrar. Pesa más de 700 megas el archivo, así que estará en ZIP.*
 
-::: {.callout-note}
+::: callout-note
 `Chat-GPT:` Perfecto, ya lo estuve “destripando” 😊. Te resumo lo que encontré como si fuera un informe de analista de tráfico:
 
 1.  **Panorama general del tráfico En el .pcapng hay:**
-- \~824,397 paquetes en total 
-- \~822k IPv4, \~1.2k IPv6
-- \~1k no-IP 
+
+-   \~824,397 paquetes en total
+-   \~822k IPv4, \~1.2k IPv6
+-   \~1k no-IP
 
 Proporción por protocolo de capa 3:
 
-- ICMP: \~62.5% (515k paquetes) → muchísimo 
-- UDP: \~37.2% (306k paquetes) 
-- TCP: casi inexistente: 270 paquetes (\~0.03%) 
+-   ICMP: \~62.5% (515k paquetes) → muchísimo
+-   UDP: \~37.2% (306k paquetes)
+-   TCP: casi inexistente: 270 paquetes (\~0.03%)
 
 Top hosts internos: 192.168.10.13 – host más activo (principal origen) 192.168.10.1 – muy probablemente el gateway/router 192.168.10.12 – segundo host interno importante 192.168.10.11 – aparece casi sólo en TFTP También aparecen direcciones raras como 192.168.10.0 y destino 255.255.255.0 usadas como si fueran hosts. Destinos externos relevantes: 8.8.8.8 (Google DNS) 1.1.1.1 (Cloudflare DNS) 23.64.121.49 (IP de un servidor HTTP, muy probablemente Akamai / CDN)
 
-2.  **Anomalía #1 – Tráfico ICMP** brutal entre pocos hosts Hay más de 515,000 paquetes ICMP distribuidos en solo 4 flujos: 192.168.10.13 ↔ 192.168.10.1 192.168.10.13 ↔ 192.168.10.12 Tipos ICMP observados: 
+2.  **Anomalía #1 – Tráfico ICMP** brutal entre pocos hosts Hay más de 515,000 paquetes ICMP distribuidos en solo 4 flujos: 192.168.10.13 ↔ 192.168.10.1 192.168.10.13 ↔ 192.168.10.12 Tipos ICMP observados:
 
-- **Type 8, code 0** – Echo Request (pings) 
-- **Type 0, code 0**– Echo Reply
-- **Type 3, code 1** – Destination Unreachable (host unreachable) 
-- **Type 3, code 2** – Destination Unreachable (protocol unreachable)
+-   **Type 8, code 0** – Echo Request (pings)
+-   **Type 0, code 0**– Echo Reply
+-   **Type 3, code 1** – Destination Unreachable (host unreachable)
+-   **Type 3, code 2** – Destination Unreachable (protocol unreachable)
 
- <mark>Lo raro: Para un entorno normal, no es nada común tener \>500k ICMP en una captura así. Hay flujos ICMP muy simétricos, con \>120k paquetes por flujo (parece ping flood o prueba de estrés). Presencia continua de Destination Unreachable indica que se está intentando llegar a algo que no responde o a un servicio cerrado. 
- <strong> 👉 Interpretación: </strong>  Esto huele a ataque o prueba de ICMP flood / host discovery masivo entre 192.168.10.13, 192.168.10.1 y 192.168.10.12. No parece tráfico “normal de usuario” (tipo un par de pings).</mark>
+<mark>Lo raro: Para un entorno normal, no es nada común tener \>500k ICMP en una captura así. Hay flujos ICMP muy simétricos, con \>120k paquetes por flujo (parece ping flood o prueba de estrés). Presencia continua de Destination Unreachable indica que se está intentando llegar a algo que no responde o a un servicio cerrado. <strong> 👉 Interpretación: </strong> Esto huele a ataque o prueba de ICMP flood / host discovery masivo entre 192.168.10.13, 192.168.10.1 y 192.168.10.12. No parece tráfico “normal de usuario” (tipo un par de pings).</mark>
 
-3.  **Anomalía #2 – Tormenta de DHCP (UDP 67)** con direcciones “raras” Puertos destino más usados (UDP/TCP): 
-- 67/UDP (DHCP server): \~304,315 paquetes 
-- 53/UDP (DNS): 1,280 
-- 16990/UDP: 875 
-- 80/TCP: 150 
-- 69/UDP (TFTP): 22 
-- 137/UDP, 138/UDP
-- 5355/UDP: unos cuantos (NetBIOS/LLMNR) 
+3.  **Anomalía #2 – Tormenta de DHCP (UDP 67)** con direcciones “raras” Puertos destino más usados (UDP/TCP):
 
-Al revisar UDP hacia/desde puerto 67: Tráfico repetido del tipo: 192.168.10.0:68 → 192.168.10.255:67 Lo raro: Un cliente DHCP típico usa: 0.0.0.0:68 → 255.255.255.255:67 Aquí se usa 192.168.10.0 como origen (que normalmente es la dirección de red, no un host) y 192.168.10.255 como broadcast. El volumen es enorme: más de 300k paquetes DHCP. 
+-   67/UDP (DHCP server): \~304,315 paquetes
+-   53/UDP (DNS): 1,280
+-   16990/UDP: 875
+-   80/TCP: 150
+-   69/UDP (TFTP): 22
+-   137/UDP, 138/UDP
+-   5355/UDP: unos cuantos (NetBIOS/LLMNR)
+
+Al revisar UDP hacia/desde puerto 67: Tráfico repetido del tipo: 192.168.10.0:68 → 192.168.10.255:67 Lo raro: Un cliente DHCP típico usa: 0.0.0.0:68 → 255.255.255.255:67 Aquí se usa 192.168.10.0 como origen (que normalmente es la dirección de red, no un host) y 192.168.10.255 como broadcast. El volumen es enorme: más de 300k paquetes DHCP.
 
 <mark> <strong>👉 Interpretación:</strong> Esto es altamente sospechoso de DHCP starvation / DHCP flood o de una herramienta que genera tráfico DHCP malformado o spoofeado. El uso de 192.168.10.0 como host refuerza la idea de spoofing o de un escenario de laboratorio para ataques.</mark>
 
-_[...]_
+*\[...\]*
 
-9.  **Resumen ejecutivo** _[...]_
- En este .pcapng se observan múltiples comportamientos anómalos altamente sugerentes de un escenario de laboratorio con ataques: ICMP flood / scanning masivo entre 192.168.10.13, 192.168.10.1 y 192.168.10.12 (más de 500k paquetes ICMP). Tormenta DHCP con direcciones de origen/destino no estándar (192.168.10.0 → 192.168.10.255, \>300k paquetes), compatible con DHCP starvation o flood _[...]_.
+9.  **Resumen ejecutivo** *\[...\]* En este .pcapng se observan múltiples comportamientos anómalos altamente sugerentes de un escenario de laboratorio con ataques: ICMP flood / scanning masivo entre 192.168.10.13, 192.168.10.1 y 192.168.10.12 (más de 500k paquetes ICMP). Tormenta DHCP con direcciones de origen/destino no estándar (192.168.10.0 → 192.168.10.255, \>300k paquetes), compatible con DHCP starvation o flood *\[...\]*.
 :::
 
-## Diagnóstico final 
-Con base en nuestra revisión del tráfico capturado y en la interpretación de Chat-GPT, se identificaron los siguientes elementos: 
-1. ICMP Flood/Ping Flood: Chat-GPT fue capaz de reconocer más de 515,000 paquetes ICMP entre pocos hosts. Su interpretación hace hincapié en la existencia de un tráfico anormalmente elevado, y cito, “orientado a saturar la red o realizar reconocimiento agresivo”.
- 
-2. DHCP Starvation: En este caso, Chat-GPT encontró más de 300,000 solicitudes DHCP con direcciones inválidas (192.168.10.0, por ejemplo). La interpretación se centra en el intento de consumir todas las direcciones del servidor DHCP para impedir que clientes legítimos reciban red.
+## Diagnóstico final
 
-3. Uso excesivo de un puerto UDP atípico (67).
+Con base en nuestra revisión del tráfico capturado y en la interpretación de Chat-GPT, se identificaron los siguientes elementos: 1. ICMP Flood/Ping Flood: Chat-GPT fue capaz de reconocer más de 515,000 paquetes ICMP entre pocos hosts. Su interpretación hace hincapié en la existencia de un tráfico anormalmente elevado, y cito, “orientado a saturar la red o realizar reconocimiento agresivo”.
+
+2.  DHCP Starvation: En este caso, Chat-GPT encontró más de 300,000 solicitudes DHCP con direcciones inválidas (192.168.10.0, por ejemplo). La interpretación se centra en el intento de consumir todas las direcciones del servidor DHCP para impedir que clientes legítimos reciban red.
+
+3.  Uso excesivo de un puerto UDP atípico (67).
 
 También, Chat-GPT hizo varios descubrimientos que nosotros no notamos (o no buscamos) cuando hicimos nuestro análisis pero, por otra parte, sospecha de algunas anomalías inexistentes. Adjuntamos la transcripción de Chat-GPT sobre sus descubrimientos adicionales.
 
-
-::: {.callout-note}
-
+::: callout-note
 3.  **SYN Scan / SYN Flood:** Evidencia: 270 paquetes TCP con flag SYN, sin SYN-ACK ni ACK. Interpretación: escaneo semiabierto o ataque de negación de servicio.
 4.  **Spoofing de direcciones IP:** Evidencia: direcciones imposibles usando cabeceras IP válidas. Interpretación: ocultamiento deliberado del origen del tráfico.
 5.  **TFTP Broadcast Anómalo:** Evidencia: host 192.168.10.11 enviando requests TFTP a broadcast. Interpretación: búsqueda de servidores TFTP o inicios de transferencia no autorizada.
 6.  **Canal UDP sospechoso (16990):** Evidencia: flujo intenso entre 192.168.10.12 y 192.168.10.13. Interpretación: posible túnel, canal C2, o aplicación no autorizada.
 
-**Síntomas observados:** 
+**Síntomas observados:**
 
-- Saturación de tráfico ICMP 
-- Pérdida de disponibilidad en DHCP 
-- Intentos de conexión TCP incompletos
-- Tráfico interno no autorizado 
-_[...]_
-- Congestión generalizada por tráfico repetitivo 
-- Impacto potencial
-    - Disponibilidad: Caída del servidor DHCP → usuarios sin conectividad 
-    - Saturación de red por ICMP → latencia elevada 
-    _[...]_
-    - Exploración de puertos (SYN scan) Operaciones: Interrupción del trabajo de usuarios 
-    - Inestabilidad en servicios críticos 
-    - Potencial escalación a explotación de vulnerabilidades
+-   Saturación de tráfico ICMP
+-   Pérdida de disponibilidad en DHCP
+-   Intentos de conexión TCP incompletos
+-   Tráfico interno no autorizado *\[...\]*
+-   Congestión generalizada por tráfico repetitivo
+-   Impacto potencial
+    -   Disponibilidad: Caída del servidor DHCP → usuarios sin conectividad
+    -   Saturación de red por ICMP → latencia elevada *\[...\]*
+    -   Exploración de puertos (SYN scan) Operaciones: Interrupción del trabajo de usuarios
+    -   Inestabilidad en servicios críticos
+    -   Potencial escalación a explotación de vulnerabilidades
 :::
-
 
 ## Propuesta de mitigación
 
 ### Propuesta del equipo
 
-Después de analizar el tráfico capturado, se recalca que la mayor parte del problema viene de una cantidad excesiva de paquetes ICMP, especialmente de pings (Echo Request). Esto puede saturar la red, causar lentitud y afectar a otros dispositivos. Por ello se propone las siguientes acciones para mitigar este tipo de ataque: 
+Después de analizar el tráfico capturado, se recalca que la mayor parte del problema viene de una cantidad excesiva de paquetes ICMP, especialmente de pings (Echo Request). Esto puede saturar la red, causar lentitud y afectar a otros dispositivos. Por ello se propone las siguientes acciones para mitigar este tipo de ataque:
 
-
-1. Limitar la cantidad de pings permitidos por segundo. Configurar en el router o firewall un límite de cuántas solicitudes ICMP puede recibir el equipo por segundo. Con esto, aunque un atacante mande miles de pings, el router simplemente los va a ignorar. 
-2. Bloquear pings provenientes de direcciones sospechosas. En la captura vimos direcciones que no deberían existir (como 192.168.10.0). Se pueden bloquear manualmente para evitar que envíen más paquetes ICMP. 
-3. Reducir el uso de ICMP dentro de la red. Si no es estrictamente necesario, se puede restringir el ping entre todos los equipos para reducir la superficie de ataque. Por ejemplo: permitir pings solo al gateway para diagnóstico y bloquear el resto. 
-4. Monitorear el equipo que más paquetes ICMP envió. El host 192.168.10.13 fue el más activo. Se recomienda revisarlo, porque puede estar infectado o mal configurado. 
-5. Crear alertas si el volumen de ICMP sube más de lo normal. Configurar herramientas de monitoreo básico para que avise si se detecta de nuevo una cantidad alta de ICMP.
+1.  Limitar la cantidad de pings permitidos por segundo. Configurar en el router o firewall un límite de cuántas solicitudes ICMP puede recibir el equipo por segundo. Con esto, aunque un atacante mande miles de pings, el router simplemente los va a ignorar.
+2.  Bloquear pings provenientes de direcciones sospechosas. En la captura vimos direcciones que no deberían existir (como 192.168.10.0). Se pueden bloquear manualmente para evitar que envíen más paquetes ICMP.
+3.  Reducir el uso de ICMP dentro de la red. Si no es estrictamente necesario, se puede restringir el ping entre todos los equipos para reducir la superficie de ataque. Por ejemplo: permitir pings solo al gateway para diagnóstico y bloquear el resto.
+4.  Monitorear el equipo que más paquetes ICMP envió. El host 192.168.10.13 fue el más activo. Se recomienda revisarlo, porque puede estar infectado o mal configurado.
+5.  Crear alertas si el volumen de ICMP sube más de lo normal. Configurar herramientas de monitoreo básico para que avise si se detecta de nuevo una cantidad alta de ICMP.
 
 En resumen: Limitar ICMP, bloquear direcciones raras, monitorear el equipo más activo y activar alertas para evitar que un ping flood o DHCP Starvation vuelva a saturar la red.
 
 ### Chat-GPT:
 
+::: callout-note
+1.  **Mitigación contra ICMP Flood (Ping Flood)**
 
-::: {.callout-note}
+    1.  Implementar rate limiting en dispositivos perimetrales. Configurar límites para las solicitudes ICMP de tipo echo-request. Esto reduce la saturación del plano de control. Ejemplo de regla para limitar a 10 paquetes por segundo:
 
-1.  **Mitigación contra ICMP Flood (Ping Flood)** 
-    1. Implementar rate limiting en dispositivos perimetrales. Configurar límites para las solicitudes ICMP de tipo echo-request. Esto reduce la saturación del plano de control. Ejemplo de regla para limitar a 10 paquetes por segundo: 
-    
-    iptables -A INPUT -p icmp –icmp-type echo-request -m limit –limit 10/second -j ACCEPT
-     iptables -A INPUT -p icmp –icmp-type echo-request -j DROP 
+    iptables -A INPUT -p icmp –icmp-type echo-request -m limit –limit 10/second -j ACCEPT iptables -A INPUT -p icmp –icmp-type echo-request -j DROP
 
     2.  Filtrado de direcciones malformadas Bloquear paquetes ICMP provenientes de direcciones que no deberían usarse como origen, como 192.168.10.0 o 255.255.255.0. 1.3. Control Plane Policing (CoPP) Configurar políticas en el router para limitar la cantidad de ICMP que llega al CPU.
 
-2. **Mitigación contra DHCP Starvation / DHCP Flood** 
-    1. Habilitar DHCP Snooping Evita que puertos no autorizados generen solicitudes DHCP masivas. Configuración recomendada: 
-    ip dhcp snooping
-    ip dhcp snooping vlan 10 
-    interface GigabitEthernet0/1 
-    ip dhcp snooping limit rate 10 
-    2. Implementar Port Security 
-    Limitar la cantidad de direcciones MAC permitidas por puerto para impedir creación de cientos de clientes falsos. 
-    switchport port-security 
-    switchport port-security maximum 2 
-    switchport port-security violation restrict
+2.  **Mitigación contra DHCP Starvation / DHCP Flood**
 
-3.  **Mitigación contra SYN Scan y SYN Flood** 
-    1. Activar SYN Cookies Esta función impide que los recursos del servidor se agoten durante ataques de inundación. 
-    sysctl -w net.ipv4.tcp_syncookies=1 
-    2. Configurar rate limiting para paquetes SYN. Limita la cantidad de solicitudes de conexión TCP sin completar handshake. 
-    iptables -A INPUT -p tcp –syn -m limit –limit 5/sec -j ACCEPT 
-    iptables -A INPUT -p tcp –syn -j DROP
+    1.  Habilitar DHCP Snooping Evita que puertos no autorizados generen solicitudes DHCP masivas. Configuración recomendada: ip dhcp snooping ip dhcp snooping vlan 10 interface GigabitEthernet0/1 ip dhcp snooping limit rate 10
+    2.  Implementar Port Security Limitar la cantidad de direcciones MAC permitidas por puerto para impedir creación de cientos de clientes falsos. switchport port-security switchport port-security maximum 2 switchport port-security violation restrict
 
-4.  **Mitigación contra Spoofing de IP** 
-    1. Activar Reverse Path Filtering Permite detectar y descartar paquetes con direcciones de origen falsificadas.
-    sysctl -w net.ipv4.conf.all.rp_filter=1
-    2. Aplicar Unicast Reverse Path Forwarding (uRPF). Se recomienda habilitar uRPF en modo estricto para evitar spoofing en redes internas. 
-    ip verify unicast source reachable-via rx
+3.  **Mitigación contra SYN Scan y SYN Flood**
 
-5. **Mitigación contra TFTP broadcast no autorizado 5.1.** Bloquear el puerto UDP/69 salvo excepciones explícitas. Restringirlo en toda la red interna para evitar transferencia abierta de archivos. iptables -A INPUT -p udp –dport 69 -j DROP 
-    1. Uso de ACLs Aplicar listas de control para bloquear solicitudes hacia broadcast donde no son necesarias. 
-    deny udp any any eq 69
+    1.  Activar SYN Cookies Esta función impide que los recursos del servidor se agoten durante ataques de inundación. sysctl -w net.ipv4.tcp_syncookies=1
+    2.  Configurar rate limiting para paquetes SYN. Limita la cantidad de solicitudes de conexión TCP sin completar handshake. iptables -A INPUT -p tcp –syn -m limit –limit 5/sec -j ACCEPT iptables -A INPUT -p tcp –syn -j DROP
 
-6.  **Mitigación contra canales UDP no estándar** 
-    1. Bloquear el tráfico hacia el puerto 16990 Cerrar el puerto 16990 en el firewall perimetral y local si no existe una justificación documentada. _[...]_
+4.  **Mitigación contra Spoofing de IP**
 
-7.  **Mitigación continua (Monitoreo y endurecimiento)** 
-    1. Configurar un IDS/IPS. Se recomienda utilizar Snort o Suricata con reglas específicas para detectar:
-    - Flood ICMP Solicitudes 
-    - DHCP anómalas 
-    - Escaneos SYN 
-    - Spoofing 
-    - Uso de puertos no estándar 
-    2. Establecimiento de alertas. Configurar alertas en herramientas de monitoreo como Zabbix, PRTG o Grafana. Los umbrales sugeridos incluyen: Aumento anormal en tráfico ICMP, Incremento en solicitudes DHCP, Elevación en paquetes TCP SYN, Actividad inesperada en puertos UDP 
-    3. Endurecimiento de sistemas Actualización continua de sistemas y firmware Deshabilitar servicios no utilizados (como TFTP) Monitoreo de integridad con herramientas como Wazuh o Tripwire
+    1.  Activar Reverse Path Filtering Permite detectar y descartar paquetes con direcciones de origen falsificadas. sysctl -w net.ipv4.conf.all.rp_filter=1
+    2.  Aplicar Unicast Reverse Path Forwarding (uRPF). Se recomienda habilitar uRPF en modo estricto para evitar spoofing en redes internas. ip verify unicast source reachable-via rx
+
+5.  **Mitigación contra TFTP broadcast no autorizado 5.1.** Bloquear el puerto UDP/69 salvo excepciones explícitas. Restringirlo en toda la red interna para evitar transferencia abierta de archivos. iptables -A INPUT -p udp –dport 69 -j DROP
+
+    1.  Uso de ACLs Aplicar listas de control para bloquear solicitudes hacia broadcast donde no son necesarias. deny udp any any eq 69
+
+6.  **Mitigación contra canales UDP no estándar**
+
+    1.  Bloquear el tráfico hacia el puerto 16990 Cerrar el puerto 16990 en el firewall perimetral y local si no existe una justificación documentada. *\[...\]*
+
+7.  **Mitigación continua (Monitoreo y endurecimiento)**
+
+    1.  Configurar un IDS/IPS. Se recomienda utilizar Snort o Suricata con reglas específicas para detectar:
+
+    -   Flood ICMP Solicitudes
+    -   DHCP anómalas
+    -   Escaneos SYN
+    -   Spoofing
+    -   Uso de puertos no estándar
+
+    2.  Establecimiento de alertas. Configurar alertas en herramientas de monitoreo como Zabbix, PRTG o Grafana. Los umbrales sugeridos incluyen: Aumento anormal en tráfico ICMP, Incremento en solicitudes DHCP, Elevación en paquetes TCP SYN, Actividad inesperada en puertos UDP
+    3.  Endurecimiento de sistemas Actualización continua de sistemas y firmware Deshabilitar servicios no utilizados (como TFTP) Monitoreo de integridad con herramientas como Wazuh o Tripwire
 :::
 
 # Conclusión del Proyecto
+
 El desarrollo integral del proyecto permitió demostrar de manera práctica cómo distintos ataques de denegación de servicio —particularmente ICMP Flood y DHCP Starvation— pueden comprometer la disponibilidad de una red incluso en escenarios locales aparentemente protegidos. La simulación confirmó que el ICMP Flood provoca un impacto inmediato y masivo en el tráfico, mientras que el DHCP Starvation opera de forma silenciosa hasta agotar los recursos del servidor DHCP. El análisis de tráfico con Python y los resultados generados por ChatGPT mostraron patrones claros de anomalías, identificando a los dispositivos involucrados y validando la naturaleza de los ataques. En la última fase resalta la crucialidad de un experto en área para discriminar comportamientos anómalos de los comúnes, contextualizar tráfico en una red y comprender la configuración y medidas de prevención personalizadas: áreas en las cuales fallan las herramientas de inteligencia artificial. No obstante, estas pueden detectar en corto tiempo (aunque limitadas por el peso de los archivos) bastantes comportamientos generalmente denominados como atípicos. Este enfoque complementario entre simulación, análisis estadístico y diagnóstico asistido por IA refuerza la importancia de la observabilidad y la correlación de eventos en la ciberseguridad moderna. En conjunto, el proyecto evidencia la urgencia de implementar estrategias de defensa ya que cualquier red se encuentra comunmente vulnerable.
